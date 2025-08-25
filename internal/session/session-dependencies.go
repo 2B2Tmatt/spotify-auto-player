@@ -3,6 +3,7 @@ package sessions
 import (
 	"crypto/rand"
 	"encoding/base64"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -26,6 +27,11 @@ func NewStore() *Store {
 func (s *Store) EnsureSessionID(w http.ResponseWriter, r *http.Request) string {
 	cookie, err := r.Cookie(cookieName)
 	if err == nil && cookie.Value != "" {
+		s.Mu.Lock()
+		if _, exists := s.SessionMap[cookie.Value]; !exists {
+			s.SessionMap[cookie.Value] = &Session{ID: cookie.Value, LastSeen: time.Now()}
+		}
+		s.Mu.Unlock()
 		return cookie.Value
 	}
 	sid := randomB64(32)
@@ -75,9 +81,14 @@ func randomB64(length int) string {
 	return base64.RawURLEncoding.EncodeToString(byteSlice)
 }
 
-func (s *Store) AddPendingAuth(sid string, pending *PendingAuth) {
+func (s *Store) AddPendingAuth(w http.ResponseWriter, r *http.Request, sid string, pending *PendingAuth) {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
+	_, exists := s.SessionMap[sid]
+	if !exists {
+		log.Println("No session exists, can not add pending auth")
+		return
+	}
 	s.SessionMap[sid].PendingAuth = pending
 }
 
@@ -98,11 +109,12 @@ type PendingAuth struct {
 }
 
 type Tokens struct {
-	AccessToken  string        `json:"access_token"`
-	RefreshToken string        `json:"refresh_token"`
-	ExpiresIn    time.Duration `json:"expires_in"`
-	Scope        string        `json:"scope"`
-	TokenType    string        `json:"token_type"`
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+	Scope        string `json:"scope"`
+	TokenType    string `json:"token_type"`
+	ExpiresAt    time.Time
 }
 
 type UserProfile struct {
