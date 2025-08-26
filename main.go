@@ -37,6 +37,7 @@ func main() {
 	store := sessions.NewStore()
 	http.HandleFunc("/auth", func(w http.ResponseWriter, r *http.Request) { handlers.AuthStart(w, r, store, &Cfg) })
 	http.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) { handlers.AuthCallBack(w, r, store, &Cfg) })
+	http.HandleFunc("/loop", handlers.Loop)
 	err = http.ListenAndServe(PORT, nil)
 	if err != nil {
 		log.Println("Error starting server")

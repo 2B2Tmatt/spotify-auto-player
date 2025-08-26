@@ -3,7 +3,7 @@ package sessions
 import (
 	"crypto/rand"
 	"encoding/base64"
-	"log"
+	"errors"
 	"net/http"
 	"sync"
 	"time"
@@ -52,11 +52,25 @@ func (s *Store) EnsureSessionID(w http.ResponseWriter, r *http.Request) string {
 	return sid
 }
 
-func (s *Store) Get(sid string) (*Session, bool) {
+func (s *Store) GetSessionSnapshot(sid string) (Session, bool) {
 	s.Mu.RLock()
 	defer s.Mu.RUnlock()
 	session, exists := s.SessionMap[sid]
-	return session, exists
+	if !exists {
+		return Session{}, false
+	}
+	return *session, exists
+}
+
+func (s *Store) SetSessionToken(sid string, token Tokens) error {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	_, exists := s.SessionMap[sid]
+	if !exists {
+		return errors.New("no existing session for session token")
+	}
+	s.SessionMap[sid].Tokens = &token
+	return nil
 }
 
 func (s *Store) Save(sid string, session *Session) {
@@ -81,16 +95,65 @@ func randomB64(length int) string {
 	return base64.RawURLEncoding.EncodeToString(byteSlice)
 }
 
-func (s *Store) AddPendingAuth(w http.ResponseWriter, r *http.Request, sid string, pending *PendingAuth) {
+func (s *Store) SetPendingAuth(sid string, pendingAuth PendingAuth) error {
 	s.Mu.Lock()
 	defer s.Mu.Unlock()
 	_, exists := s.SessionMap[sid]
 	if !exists {
-		log.Println("No session exists, can not add pending auth")
-		return
+		return errors.New("no existing session for pending auth")
 	}
-	s.SessionMap[sid].PendingAuth = pending
+	s.SessionMap[sid].PendingAuth = &pendingAuth
+	return nil
 }
+
+func (s *Store) RemovePendingAuth(sid string) error {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	_, exists := s.SessionMap[sid]
+	if !exists {
+		return errors.New("no existing session for pending auth")
+	}
+	s.SessionMap[sid].PendingAuth = nil
+	return nil
+}
+
+func (s *Store) GetPendingAuthCopy(sid string) (PendingAuth, bool, error) {
+	s.Mu.RLock()
+	defer s.Mu.RUnlock()
+	session, exists := s.SessionMap[sid]
+	if !exists {
+		return PendingAuth{}, false, errors.New("no existing session for pending auth")
+	}
+	if session.PendingAuth == nil {
+		return PendingAuth{}, false, errors.New("no pending auth exists")
+	}
+	return *session.PendingAuth, true, nil
+}
+func (s *Store) GetTokensCopy(sid string) (Tokens, bool, error) {
+	s.Mu.RLock()
+	defer s.Mu.RUnlock()
+	session, exists := s.SessionMap[sid]
+	if !exists {
+		return Tokens{}, false, errors.New("no existing session for token")
+	}
+	if session.Tokens == nil {
+		return Tokens{}, false, errors.New("no token exists")
+	}
+	return *session.Tokens, true, nil
+}
+
+func (s *Store) SetTokenExpiration(sid string, time time.Time) bool {
+	s.Mu.Lock()
+	defer s.Mu.Unlock()
+	session, exists := s.SessionMap[sid]
+	if !exists {
+		return false
+	}
+	session.Tokens.ExpiresAt = time
+	return true
+}
+
+// func (s *Store) GetUserCopy(sid string) (UserProfile, bool, error)
 
 type Session struct {
 	ID          string

@@ -1,0 +1,25 @@
+package spotify
+
+import (
+	"fmt"
+	"net/http"
+)
+
+type PlaybackState struct {
+	id         string `json:"id"`
+	is_playing bool   `json:"is_playing"`
+}
+
+type User struct {
+	SessionToken string
+	Client       *http.Client
+}
+
+func (user *User) GetPlaybackState() (PlaybackState, error) {
+	stateReq, err := http.NewRequest(http.MethodGet, "https://api.spotify.com/v1/me/player", nil)
+	if err != nil {
+		return PlaybackState{}, err
+	}
+	stateReq.Header.Set("Authorization", fmt.Sprintf("Bearer %s", user.SessionToken))
+	user.Client.Do()
+}
