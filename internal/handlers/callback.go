@@ -109,5 +109,5 @@ func AuthCallBack(w http.ResponseWriter, r *http.Request, store *sessions.Store,
 	log.Println("Session token:", tokenCopy.AccessToken, "\n\n")
 	store.RemovePendingAuth(sid)
 
-	http.Redirect(w, r, "/loop", http.StatusSeeOther)
+	http.Redirect(w, r, "/cleanse", http.StatusSeeOther)
 }
