@@ -4,20 +4,35 @@ import (
 	"log"
 	"net/http"
 	sessions "spotify-auto-p/internal/session"
+	"spotify-auto-p/internal/spotify"
 	"time"
 )
 
 func Loop(w http.ResponseWriter, r *http.Request, store *sessions.Store) {
-	pauses := 0
-	client := http.Client{Timeout: time.Second * 8}
-	stateReq, err := http.NewRequest(http.MethodGet, "https://api.spotify.com/v1/me/player", nil)
-	stateReq.Header.Set("Authorization")
+	cookie, err := r.Cookie("sid")
 	if err != nil {
-		log.Println(err)
+		log.Println("No cookie in request", err)
 		return
 	}
-
-	for pauses < 5 {
-
+	sid := cookie.Value
+	tokenCopy, _, err := store.GetTokensCopy(sid)
+	if err != nil {
+		log.Println("Error getting token", err)
 	}
+	tokenVal := tokenCopy.AccessToken
+	log.Println("Token val:", tokenVal)
+	client := http.Client{Timeout: time.Second * 8}
+	user := spotify.User{SessionToken: tokenVal, Client: &client}
+
+	log.Println("This worked")
+	state, err := user.GetPlaybackState()
+	if err != nil {
+		log.Println("Error getting playback state", err)
+	}
+	log.Println("This is the state: ", *state)
+	err = user.Pause()
+	if err != nil {
+		log.Println("Error unpausing", err)
+	}
+	http.Error(w, "This worked lol", http.StatusAccepted)
 }

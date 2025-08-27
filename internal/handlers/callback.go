@@ -18,7 +18,7 @@ func AuthCallBack(w http.ResponseWriter, r *http.Request, store *sessions.Store,
 		return
 	}
 	sid := cookie.Value
-	session, exists := store.GetSessionSnapshot(sid)
+	_, exists := store.GetSessionSnapshot(sid)
 	if !exists {
 		log.Println("AuthCallBack - No session exists", err)
 		return
@@ -104,10 +104,10 @@ func AuthCallBack(w http.ResponseWriter, r *http.Request, store *sessions.Store,
 		log.Println(err)
 		return
 	}
+
 	log.Println("I worked!")
-	log.Println("Session token:", tokenCopy, "\n\n")
-	log.Println("Pending Auth:", pendingAuth, "\n\n")
-	log.Println("Last seen:", session.LastSeen, "\n\n")
+	log.Println("Session token:", tokenCopy.AccessToken, "\n\n")
 	store.RemovePendingAuth(sid)
-	http.Redirect(w, r, "/loop", http.StatusPermanentRedirect)
+
+	http.Redirect(w, r, "/loop", http.StatusSeeOther)
 }
